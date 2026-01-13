@@ -90,10 +90,11 @@
     <button id="markBtn" disabled>マーク</button>
     <button id="prevMarkBtn" disabled>前のマーク / 冒頭</button>
     <button id="nextMarkBtn" disabled>次のマーク</button>
+    <button id="deleteMarkBtn" disabled>現在位置のマークを削除</button>
     <button id="exportBtn" disabled>マークをエクスポート</button>
     <button id="importBtn" disabled>マークをインポート</button>
     <input type="file" id="importFileInput" accept="application/json" style="display:none;">
-  </div>
+  </div> 
 
   <div class="section">
     <strong>マーク一覧:</strong>
@@ -124,6 +125,7 @@
     const nextMarkBtn = document.getElementById('nextMarkBtn');
     const exportBtn = document.getElementById('exportBtn');
     const importBtn = document.getElementById('importBtn');
+    const deleteMarkBtn = document.getElementById('deleteMarkBtn');
     const importFileInput = document.getElementById('importFileInput');
     const marksListEl = document.getElementById('marksList');
     const logEl = document.getElementById('log');
@@ -233,6 +235,7 @@
       markBtn.disabled = !enabled;
       prevMarkBtn.disabled = !enabled;
       nextMarkBtn.disabled = !enabled;
+      deleteMarkBtn.disabled = !enabled;
       exportBtn.disabled = !enabled;
       importBtn.disabled = !enabled;
     }
@@ -336,6 +339,53 @@
       } else {
         audioPlayer.currentTime = target;
         log(`次のマークへジャンプ: ${target.toFixed(3)} 秒`);
+      }
+    });
+
+    // 現在位置のマークを削除（現在位置に近いマークがあればそれを削除、なければ直前のマークを削除）
+    deleteMarkBtn.addEventListener('click', async () => {
+      if (!audioPlayer.src || currentMarks.length === 0 || currentFileKey == null) return;
+      const currentTime = audioPlayer.currentTime;
+      const TOL = 0.5; // 秒、現在位置に近いマークを優先して削除
+      // 近いマークを探す
+      let closestIndex = -1;
+      let closestDiff = Infinity;
+      for (let i = 0; i < currentMarks.length; i++) {
+        const diff = Math.abs(currentMarks[i] - currentTime);
+        if (diff < closestDiff) {
+          closestDiff = diff;
+          closestIndex = i;
+        }
+      }
+      let targetIndex = -1;
+      if (closestDiff <= TOL) {
+        targetIndex = closestIndex;
+      } else {
+        // 直前のマークを探す
+        const sorted = currentMarks.slice().sort((a, b) => a - b);
+        let targetTime;
+        for (let i = sorted.length - 1; i >= 0; i--) {
+          if (sorted[i] < currentTime - 0.01) {
+            targetTime = sorted[i];
+            break;
+          }
+        }
+        if (typeof targetTime !== 'undefined') {
+          targetIndex = currentMarks.indexOf(targetTime);
+        }
+      }
+      if (targetIndex === -1) {
+        log('削除対象のマークが見つかりません。');
+        return;
+      }
+      const removed = currentMarks.splice(targetIndex, 1)[0];
+      updateMarksUI();
+      log(`マークを削除: ${removed.toFixed(3)} 秒`);
+      try {
+        await saveMarks(currentFileKey, currentMarks);
+        log('削除を保存しました。');
+      } catch (e) {
+        log('マーク削除の保存に失敗しました。');
       }
     });
 
