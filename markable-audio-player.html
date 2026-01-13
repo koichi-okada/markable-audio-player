@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>音声再生PWA（マーク付きプレイヤー）</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- PWA 用（manifest / アイコンは別途用意想定） -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#222222">
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 16px;
+      background: #111;
+      color: #f5f5f5;
+    }
+    h1 {
+      font-size: 1.4rem;
+      margin-bottom: 12px;
+    }
+    .section {
+      margin-bottom: 16px;
+    }
+    button {
+      padding: 8px 12px;
+      margin: 4px;
+      border-radius: 4px;
+      border: none;
+      background: #2d6cdf;
+      color: #fff;
+      font-size: 0.9rem;
+    }
+    button:disabled {
+      background: #555;
+      color: #aaa;
+    }
+    input[type="file"] {
+      margin-top: 4px;
+      margin-bottom: 8px;
+    }
+    #controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 8px;
+    }
+    #log {
+      font-size: 0.8rem;
+      background: #1b1b1b;
+      padding: 8px;
+      border-radius: 4px;
+      max-height: 200px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+    #marksList {
+      font-size: 0.85rem;
+      margin-top: 4px;
+    }
+    .mark-item {
+      display: inline-block;
+      padding: 2px 6px;
+      margin: 2px;
+      border-radius: 3px;
+      background: #333;
+      cursor: pointer;
+    }
+    .file-info {
+      font-size: 0.8rem;
+      color: #ccc;
+    }
+  </style>
+</head>
+<body>
+  <h1>音声再生PWA（マーク付きプレイヤー）</h1>
+
+  <div class="section">
+    <label for="audioFile">音声ファイルを選択:</label><br>
+    <input type="file" id="audioFile" accept="audio/*">
+    <div id="fileInfo" class="file-info"></div>
+  </div>
+
+  <div class="section">
+    <audio id="audioPlayer" controls preload="metadata" style="width: 100%;"></audio>
+  </div>
+
+  <div class="section" id="controls">
+    <button id="playPauseBtn" disabled>再生 / 一時停止</button>
+    <button id="markBtn" disabled>マーク</button>
+    <button id="prevMarkBtn" disabled>前のマーク / 冒頭</button>
+    <button id="nextMarkBtn" disabled>次のマーク</button>
+    <button id="exportBtn" disabled>マークをエクスポート</button>
+    <button id="importBtn" disabled>マークをインポート</button>
+    <input type="file" id="importFileInput" accept="application/json" style="display:none;">
+  </div>
+
+  <div class="section">
+    <strong>マーク一覧:</strong>
+    <div id="marksList">(なし)</div>
+  </div>
+
+  <div class="section">
+    <strong>ログ:</strong>
+    <div id="log"></div>
+  </div>
+
+  <script>
+    // IndexedDB 設定
+    const DB_NAME = 'audioMarks';
+    const DB_VERSION = 1;
+    const STORE_NAME = 'marks';
+
+    let db = null;
+    let currentFile = null;
+    let currentFileKey = null;
+    let currentMarks = [];
+
+    const audioFileInput = document.getElementById('audioFile');
+    const audioPlayer = document.getElementById('audioPlayer');
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    const markBtn = document.getElementById('markBtn');
+    const prevMarkBtn = document.getElementById('prevMarkBtn');
+    const nextMarkBtn = document.getElementById('nextMarkBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    const importBtn = document.getElementById('importBtn');
+    const importFileInput = document.getElementById('importFileInput');
+    const marksListEl = document.getElementById('marksList');
+    const logEl = document.getElementById('log');
+    const fileInfoEl = document.getElementById('fileInfo');
+
+    function log(message) {
+      const time = new Date().toLocaleTimeString();
+      logEl.textContent += `[${time}] ${message}\n`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onupgradeneeded = (event) => {
+          const db = event.target.result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME, { keyPath: 'fileKey' });
+          }
+        };
+        request.onsuccess = (event) => {
+          db = event.target.result;
+          resolve(db);
+        };
+        request.onerror = (event) => {
+          log('IndexedDB の初期化に失敗しました。');
+          reject(event.target.error);
+        };
+      });
+    }
+
+    function getFileKey(file) {
+      if (!file) return null;
+      const name = file.name || 'unknown';
+      const size = file.size || 0;
+      const lastModified = file.lastModified ? new Date(file.lastModified).toISOString() : 'unknown';
+      return `${name}|${size}|${lastModified}`;
+    }
+
+    function loadMarks(fileKey) {
+      return new Promise((resolve, reject) => {
+        if (!db) {
+          resolve({ fileKey, marks: [] });
+          return;
+        }
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const request = store.get(fileKey);
+        request.onsuccess = () => {
+          if (request.result) {
+            resolve(request.result);
+          } else {
+            resolve({ fileKey, marks: [] });
+          }
+        };
+        request.onerror = () => {
+          reject(request.error);
+        };
+      });
+    }
+
+    function saveMarks(fileKey, marks) {
+      return new Promise((resolve, reject) => {
+        if (!db) {
+          reject(new Error('DB not initialized'));
+          return;
+        }
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const data = { fileKey, marks };
+        const request = store.put(data);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    function updateMarksUI() {
+      marksListEl.innerHTML = '';
+      if (!currentMarks || currentMarks.length === 0) {
+        marksListEl.textContent = '(なし)';
+        return;
+      }
+      currentMarks
+        .slice()
+        .sort((a, b) => a - b)
+        .forEach((t) => {
+          const span = document.createElement('span');
+          span.className = 'mark-item';
+          span.textContent = formatTime(t);
+          span.title = `${t.toFixed(3)} 秒`;
+          span.addEventListener('click', () => {
+            audioPlayer.currentTime = t;
+            log(`マークへジャンプ: ${t.toFixed(3)} 秒`);
+          });
+          marksListEl.appendChild(span);
+        });
+    }
+
+    function formatTime(sec) {
+      const s = Math.floor(sec % 60);
+      const m = Math.floor(sec / 60);
+      return `${m}:${s.toString().padStart(2, '0')}`;
+    }
+
+    function enableControls(enabled) {
+      playPauseBtn.disabled = !enabled;
+      markBtn.disabled = !enabled;
+      prevMarkBtn.disabled = !enabled;
+      nextMarkBtn.disabled = !enabled;
+      exportBtn.disabled = !enabled;
+      importBtn.disabled = !enabled;
+    }
+
+    audioFileInput.addEventListener('change', async (event) => {
+      const file = event.target.files[0];
+      if (!file) {
+        currentFile = null;
+        currentFileKey = null;
+        currentMarks = [];
+        audioPlayer.removeAttribute('src');
+        enableControls(false);
+        updateMarksUI();
+        fileInfoEl.textContent = '';
+        log('ファイル選択がキャンセルされました。');
+        return;
+      }
+
+      currentFile = file;
+      currentFileKey = getFileKey(file);
+      const objectUrl = URL.createObjectURL(file);
+      audioPlayer.src = objectUrl;
+      audioPlayer.load();
+
+      fileInfoEl.textContent = `ファイル: ${file.name} / サイズ: ${file.size} bytes / 更新日: ${new Date(file.lastModified).toLocaleString()}`;
+      log(`ファイル選択: ${file.name}`);
+      enableControls(true);
+
+      try {
+        const record = await loadMarks(currentFileKey);
+        currentMarks = Array.isArray(record.marks) ? record.marks : [];
+        log(`マーク読み込み: ${currentMarks.length} 件`);
+        updateMarksUI();
+      } catch (e) {
+        log('マークの読み込みに失敗しました。');
+      }
+    });
+
+    playPauseBtn.addEventListener('click', () => {
+      if (!audioPlayer.src) return;
+      if (audioPlayer.paused) {
+        audioPlayer.play().then(() => {
+          log('再生開始（ユーザー操作）。');
+        }).catch((err) => {
+          log('再生開始に失敗しました: ' + err.message);
+        });
+      } else {
+        audioPlayer.pause();
+        log('一時停止。');
+      }
+    });
+
+    markBtn.addEventListener('click', async () => {
+      if (!audioPlayer.src || currentFileKey == null) return;
+      const t = audioPlayer.currentTime;
+      currentMarks.push(t);
+      currentMarks.sort((a, b) => a - b);
+      updateMarksUI();
+      log(`マーク追加: ${t.toFixed(3)} 秒`);
+      try {
+        await saveMarks(currentFileKey, currentMarks);
+        log('マークを保存しました。');
+      } catch (e) {
+        log('マーク保存に失敗しました。');
+      }
+    });
+
+    prevMarkBtn.addEventListener('click', () => {
+      if (!audioPlayer.src || currentMarks.length === 0) return;
+      const currentTime = audioPlayer.currentTime;
+      const sorted = currentMarks.slice().sort((a, b) => a - b);
+      let target = null;
+      for (let i = sorted.length - 1; i >= 0; i--) {
+        if (sorted[i] < currentTime - 0.01) {
+          target = sorted[i];
+          break;
+        }
+      }
+      if (target == null) {
+        audioPlayer.currentTime = 0;
+        log('前のマークなし: 冒頭に戻りました。');
+      } else {
+        audioPlayer.currentTime = target;
+        log(`前のマークへジャンプ: ${target.toFixed(3)} 秒`);
+      }
+    });
+
+    nextMarkBtn.addEventListener('click', () => {
+      if (!audioPlayer.src || currentMarks.length === 0) return;
+      const currentTime = audioPlayer.currentTime;
+      const sorted = currentMarks.slice().sort((a, b) => a - b);
+      let target = null;
+      for (let i = 0; i < sorted.length; i++) {
+        if (sorted[i] > currentTime + 0.01) {
+          target = sorted[i];
+          break;
+        }
+      }
+      if (target == null) {
+        log('次のマークはありません。');
+      } else {
+        audioPlayer.currentTime = target;
+        log(`次のマークへジャンプ: ${target.toFixed(3)} 秒`);
+      }
+    });
+
+    exportBtn.addEventListener('click', async () => {
+      if (!currentFile || !currentFileKey) {
+        log('エクスポート対象のファイルがありません。');
+        return;
+      }
+      try {
+        const record = await loadMarks(currentFileKey);
+        const data = {
+          fileKey: record.fileKey,
+          marks: Array.isArray(record.marks) ? record.marks : []
+        };
+        const json = JSON.stringify(data, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const baseName = currentFile.name || 'audio';
+        a.href = url;
+        a.download = `${baseName}.marks.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        log(`マークをエクスポートしました（${data.marks.length} 件）。`);
+      } catch (e) {
+        log('エクスポートに失敗しました。');
+      }
+    });
+
+    importBtn.addEventListener('click', () => {
+      if (!currentFile || !currentFileKey) {
+        log('インポート対象のファイルがありません。');
+        return;
+      }
+      importFileInput.value = '';
+      importFileInput.click();
+    });
+
+    importFileInput.addEventListener('change', async (event) => {
+      const file = event.target.files[0];
+      if (!file) {
+        log('インポートがキャンセルされました。');
+        return;
+      }
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        if (!data.fileKey || !Array.isArray(data.marks)) {
+          log('インポートファイルの形式が不正です。');
+          return;
+        }
+        if (data.fileKey !== currentFileKey) {
+          log('fileKey が現在のファイルと一致しません。インポートを中止しました。');
+          return;
+        }
+        currentMarks = data.marks.slice();
+        await saveMarks(currentFileKey, currentMarks);
+        updateMarksUI();
+        log(`マークをインポートしました（${currentMarks.length} 件）。`);
+      } catch (e) {
+        log('インポート処理中にエラーが発生しました。');
+      }
+    });
+
+    // PWA: Service Worker 登録（任意・将来のオフライン対応用）
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('service-worker.js').catch(() => {
+          log('Service Worker の登録に失敗しました。');
+        });
+      });
+    }
+
+    // 初期化
+    openDB().then(() => {
+      log('IndexedDB 初期化完了。');
+    }).catch(() => {
+      log('IndexedDB を利用できません。マーク保存は動作しません。');
+    });
+  </script>
+</body>
+</html>
