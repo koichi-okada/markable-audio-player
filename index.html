@@ -16,7 +16,7 @@
 
 body { font-family: Helvetica, Arial, sans-serif; margin: 0; padding: 48px 64px; background: #001f33; color: #a0d8ff; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
 
-h1 { font-weight: 700; font-size: 2.5rem; margin: 0 0 32px 0; letter-spacing: 2px; text-transform: uppercase; color: #a0d8ff; text-shadow: none; }
+h1 { font-weight: 700; font-size: 1.1rem; margin: 0 0 32px 0; letter-spacing: 2px; text-transform: uppercase; color: #a0d8ff; text-shadow: none; }
 
 .container { width: 100%; max-width: 800px; background: rgba(0, 31, 51, 0.9); border-radius: 20px; padding: 48px; box-shadow: none; display: flex; flex-direction: column; gap: 32px; }
 
@@ -28,7 +28,7 @@ label { font-size: 1.1rem; font-weight: 600; margin-bottom: 12px; color: #a0d8ff
 
 audio#audioPlayer { width: 100%; height: 50px; border-radius: 20px; outline: none; box-shadow: none; background: #00334d; }
 
-#controls { display: flex; justify-content: center; gap: 48px; flex-direction: row; flex-wrap: nowrap; overflow-x: auto; }lex-direction: row; }
+#controls { display: flex; justify-content: center; gap: 48px; flex-direction: row; flex-wrap: nowrap; overflow-x: auto; }
 
 button { background: transparent; border: none; cursor: pointer; color: #66ccff; display: flex; flex-direction: column; align-items: center; gap: 4px; font-weight: 600; user-select: none; padding: 0; min-width: 60px; transition: color 0.3s ease; }
 
@@ -138,17 +138,11 @@ document.getElementById('importFileInput').addEventListener('change', async (e) 
 
 if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('service-worker.js') .then(() => log('Service Worker registered.')) .catch(error => log(Service Worker registration failed: ${error.message})); }); }
 
-openDB() .then(() => log('IndexedDB initialized.')) .catch(() => log('IndexedDB not available. Marks will not be saved.')); </script>
-
-<input type="file" id="importFileInput" accept="application/json" style="display:none;">
-
-</body>
-
-</html> });
+openDB() .then(() => log('IndexedDB initialized.')) .catch(() => log('IndexedDB not available. Marks will not be saved.'));
 
 </script>
 
-
+<input type="file" id="importFileInput" accept="application/json" style="display:none;">
 
 </body>
 
