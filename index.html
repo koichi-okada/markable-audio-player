@@ -1,150 +1,288 @@
 <!DOCTYPE html>
-
-<html lang="en">
-
+<html lang="ja">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Markable Audio Player</title>
+    <style>
+        /* ===== Global Styles ===== */
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: Helvetica, Arial, sans-serif; margin: 0; padding: 20px; background: #001f33; color: #a0d8ff; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        h1 { font-weight: 700; font-size: 1.1rem; margin: 10px 0 20px 0; letter-spacing: 2px; text-transform: uppercase; color: #a0d8ff; }
+        .container { width: 100%; max-width: 800px; background: rgba(0, 31, 51, 0.9); border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 30px; }
+        .section { display: flex; flex-direction: column; align-items: center; } /* 中央寄せ */
+        
+        /* カスタムファイル選択ボタン */
+        .file-upload-wrapper { position: relative; width: fit-content; margin-bottom: 10px; }
+        .custom-file-btn { 
+            display: inline-block; padding: 10px 20px; background: transparent; 
+            border: 1px solid #66ccff; color: #66ccff; border-radius: 8px; 
+            font-size: 0.9rem; font-weight: bold; cursor: pointer;
+        }
+        #audioFile { 
+            position: absolute; left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; 
+        }
 
-<meta charset="UTF-8">
+        #fileInfo { font-size: 0.95rem; color: #7fbfff; margin: 5px 0 15px 0; font-style: italic; border-bottom: 1px solid #335577; padding-bottom: 8px; word-break: break-all; width: 100%; text-align: center; }
 
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+        /* Custom Player UI */
+        .custom-player { background: #00334d; padding: 25px; border-radius: 24px; display: flex; flex-direction: column; gap: 25px; width: 100%; }
+        
+        .player-controls-row { display: flex; align-items: center; justify-content: center; gap: 40px; width: 100%; }
+        
+        .play-pause-btn { background: #66ccff; color: #001f33; border: none; border-radius: 50%; width: 85px; height: 85px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.1s; flex-shrink: 0; }
+        .play-pause-btn:active { transform: scale(0.95); }
+        .play-pause-btn:disabled { opacity: 0.3; }
 
-<title>Markable Audio Player</title>
+        .play-icon { width: 0; height: 0; border-style: solid; border-width: 15px 0 15px 25px; border-color: transparent transparent transparent #001f33; margin-left: 6px; }
+        .pause-icon { display: flex; gap: 8px; justify-content: center; align-items: center; }
+        .pause-bar { width: 8px; height: 30px; background-color: #001f33; border-radius: 2px; }
 
-<style> /* ===== Global Styles ===== */
+        .speed-control { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; color: #a0d8ff; }
+        #speedSlider { width: 140px; accent-color: #66ccff; margin: 0; cursor: pointer; }
+        .speed-label { font-size: 0.9rem; font-weight: bold; font-family: monospace; }
 
-{ box-sizing: border-box; }
+        .seek-container { display: flex; align-items: center; gap: 15px; width: 100%; }
+        #seekBar { flex-grow: 1; height: 12px; accent-color: #66ccff; cursor: pointer; }
+        #currentTime, #duration { font-family: monospace; font-size: 1rem; min-width: 50px; }
 
-body { font-family: Helvetica, Arial, sans-serif; margin: 0; padding: 48px 64px; background: #001f33; color: #a0d8ff; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        #controls { display: flex; flex-direction: row !important; justify-content: center; gap: 20px; width: 100%; }
+        .action-btn { background: transparent; border: none; cursor: pointer; color: #66ccff; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 80px; flex: 1; }
+        .action-btn:disabled { opacity: 0.2; }
+        .action-btn .icon { font-size: 3rem; line-height: 1; }
+        .action-btn .label { font-size: 0.8rem; text-transform: lowercase; font-weight: bold; }
 
-h1 { font-weight: 700; font-size: 1.1rem; margin: 0 0 32px 0; letter-spacing: 2px; text-transform: uppercase; color: #a0d8ff; text-shadow: none; }
+        #marksList { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; width: 100%; justify-content: center; }
+        .mark-item { border: 2px solid #66ccff; padding: 12px 20px; border-radius: 30px; color: #66ccff; font-weight: bold; font-size: 1.1rem; cursor: pointer; }
 
-.container { width: 100%; max-width: 800px; background: rgba(0, 31, 51, 0.9); border-radius: 20px; padding: 48px; box-shadow: none; display: flex; flex-direction: column; gap: 32px; }
-
-.section { display: flex; flex-direction: column; }
-
-label { font-size: 1.1rem; font-weight: 600; margin-bottom: 12px; color: #a0d8ff; }
-
-#fileInfo { font-size: 0.9rem; color: #7fbfff; margin-top: -16px; margin-bottom: 24px; font-style: italic; }
-
-audio#audioPlayer { width: 100%; height: 50px; border-radius: 20px; outline: none; box-shadow: none; background: #00334d; }
-
-#controls { display: flex; justify-content: center; gap: 48px; flex-direction: row; flex-wrap: nowrap; overflow-x: auto; }
-
-button { background: transparent; border: none; cursor: pointer; color: #66ccff; display: flex; flex-direction: column; align-items: center; gap: 4px; font-weight: 600; user-select: none; padding: 0; min-width: 60px; transition: color 0.3s ease; }
-
-button:disabled { color: #335577; cursor: not-allowed; }
-
-button .icon { font-size: 2.8rem; line-height: 1; user-select: none; color: #66ccff; }
-
-button .label { font-size: 0.75rem; color: #66ccff; user-select: none; text-transform: lowercase; letter-spacing: 0.05em; }
-
-#marksList { font-size: 1.1rem; margin-top: 12px; display: flex; flex-wrap: wrap; gap: 16px; color: #a0d8ff; }
-
-.mark-item { background: transparent; border: 1.5px solid #66ccff; padding: 10px 18px; border-radius: 24px; cursor: pointer; color: #66ccff; font-weight: 700; transition: background 0.3s ease, color 0.3s ease; user-select: none; min-width: 60px; text-align: center; }
-
-.mark-item:hover { background: #66ccff; color: #001f33; }
-
-#log { font-size: 0.9rem; background: rgba(0, 31, 51, 0.75); padding: 20px; border-radius: 16px; max-height: 260px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; box-shadow: inset 0 0 0 #3399ff; color: #a0d8ff; line-height: 1.4; font-family: 'Courier New', monospace; margin-bottom: 12px; }
-
-#log::-webkit-scrollbar { width: 10px; }
-
-#log::-webkit-scrollbar-track { background: transparent; }
-
-#log::-webkit-scrollbar-thumb { background: #66ccff; border-radius: 5px; }
-
-#log::-webkit-scrollbar-thumb:hover { background: #99ccff; }
-
-#exportImport { margin-top: 0; text-align: center; font-size: 0.9rem; color: #66ccff; user-select: none; letter-spacing: 0.1em; cursor: default; }
-
-#exportImport a { color: #66ccff; text-decoration: none; margin: 0 12px; cursor: pointer; transition: color 0.3s ease; }
-
-#exportImport a:hover { color: #99ccff; text-decoration: underline; }
-
-@media (max-width: 768px) { body { padding: 24px 16px; } h1 { font-size: 1.8rem; margin-bottom: 24px; } .container { padding: 24px; gap: 24px; } button .icon { font-size: 2.2rem; } button .label { font-size: 0.65rem; } }
-
-/* Controls: three icons in a row with label below each */ #controls { gap: 64px; }
-
-#controls button { min-width: 70px; color: #66ccff; }
-
-#controls button .icon { font-size: 3rem; color: #66ccff; line-height: 1; }
-
-#controls button .label { font-size: 0.75rem; color: #66ccff; text-transform: lowercase; letter-spacing: 0.05em; margin-top: 4px; }
-
-</style>
-
+        #log { font-size: 0.85rem; background: rgba(0, 0, 0, 0.2); padding: 15px; border-radius: 12px; height: 110px; overflow-y: auto; font-family: monospace; border: 1px solid #00334d; white-space: pre-wrap; width: 100%; }
+        #exportImport { text-align: center; margin-top: 15px; color: #66ccff; }
+        #exportImport a { color: #66ccff; text-decoration: none; margin: 0 12px; font-size: 0.9rem; cursor: pointer; }
+    </style>
 </head>
-
 <body>
 
 <h1>MARKABLE AUDIO PLAYER</h1>
 
 <div class="container">
+    <div class="section">
+        <div class="file-upload-wrapper">
+            <div class="custom-file-btn">SELECT FILE</div>
+            <input type="file" id="audioFile" accept="audio/*">
+        </div>
+        <div id="fileInfo">no file selected</div>
+    </div>
 
-<div class="section"> <label for="audioFile">Select Audio File:</label> <input type="file" id="audioFile" accept="audio/*"> <div id="fileInfo" class="file-info"></div> </div>
+    <div class="custom-player">
+        <div class="player-controls-row">
+            <button class="play-pause-btn" id="playPauseBtn" disabled>
+                <div id="btnIcon"><div class="play-icon"></div></div>
+            </button>
+            <div class="speed-control">
+                <span class="speed-label">speed: <span id="speedVal">1.0</span>x</span>
+                <input type="range" id="speedSlider" min="0.5" max="4.0" step="0.1" value="1.0" disabled>
+            </div>
+        </div>
+        
+        <div class="seek-container">
+            <span id="currentTime">0:00</span>
+            <input type="range" id="seekBar" value="0" step="0.1" disabled>
+            <span id="duration">0:00</span>
+        </div>
+    </div>
 
-<div class="section"> <audio id="audioPlayer" preload="metadata" controls></audio> </div>
+    <div class="section" id="controls">
+        <button id="markBtn" class="action-btn" disabled>
+            <span class="icon">⚪︎</span>
+            <span class="label">mark</span>
+        </button>
+        <button id="deleteMarkBtn" class="action-btn" disabled>
+            <span class="icon">×</span>
+            <span class="label">delete</span>
+        </button>
+        <button id="prevMarkBtn" class="action-btn" disabled>
+            <span class="icon">&lt;</span>
+            <span class="label">previous</span>
+        </button>
+    </div>
 
-<div class="section" id="controls"> <button id="markBtn" disabled title="Add mark at current position"> <span class="icon">⚪︎</span> <span class="label">mark</span> </button> <button id="deleteMarkBtn" disabled title="Delete mark at current position"> <span class="icon">×</span> <span class="label">delete</span> </button> <button id="prevMarkBtn" disabled title="Jump to previous mark or start"> <span class="icon"><</span> <span class="label">previous</span> </button> </div>
+    <div class="section">
+        <label style="font-weight: bold; margin-bottom: 10px;">marks</label>
+        <div id="marksList">(none)</div>
+    </div>
 
-<div class="section"> <strong>Marks:</strong> <div id="marksList">(none)</div> </div>
-
-<div class="section"> <strong>Log:</strong> <div id="log"></div> <div id="exportImport"> <a href="#" id="exportBtn" disabled>export</a> │ <a href="#" id="importBtn" disabled>import</a> </div> </div>
-
+    <div class="section">
+        <div id="log"></div>
+        <div id="exportImport">
+            <a id="exportBtn" style="opacity: 0.3; pointer-events: none;">export</a> │ 
+            <a id="importBtn" style="opacity: 0.3; pointer-events: none;">import</a>
+        </div>
+    </div>
 </div>
 
-<script> // IndexedDB and app logic remain unchanged // Only IDs and button elements updated to match new UI
-
-const DB_NAME = 'audioMarks'; const DB_VERSION = 1; const STORE_NAME = 'marks';
-
-let db = null; let currentFile = null; let currentFileKey = null; let currentMarks = [];
-
-const audioFileInput = document.getElementById('audioFile'); const audioPlayer = document.getElementById('audioPlayer'); const markBtn = document.getElementById('markBtn'); const prevMarkBtn = document.getElementById('prevMarkBtn'); const deleteMarkBtn = document.getElementById('deleteMarkBtn'); const exportBtn = document.getElementById('exportBtn'); const importBtn = document.getElementById('importBtn');
-
-const marksListEl = document.getElementById('marksList'); const logEl = document.getElementById('log'); const fileInfoEl = document.getElementById('fileInfo');
-
-function log(message) { const time = new Date().toLocaleTimeString(); logEl.textContent += [${time}] ${message} ; logEl.scrollTop = logEl.scrollHeight; }
-
-function formatTime(sec) { const s = Math.floor(sec % 60); const m = Math.floor(sec / 60); return ${m}:${s.toString().padStart(2, '0')}; }
-
-function enableControls(enabled) { markBtn.disabled = !enabled; prevMarkBtn.disabled = !enabled; deleteMarkBtn.disabled = !enabled; exportBtn.disabled = !enabled; importBtn.disabled = !enabled; }
-
-function openDB() { return new Promise((resolve, reject) => { const request = indexedDB.open(DB_NAME, DB_VERSION); request.onupgradeneeded = (event) => { const db = event.target.result; if (!db.objectStoreNames.contains(STORE_NAME)) { db.createObjectStore(STORE_NAME, { keyPath: 'fileKey' }); log('IndexedDB: Object store created.'); } }; request.onsuccess = (event) => { db = event.target.result; log('✓ Connected to IndexedDB.'); resolve(db); }; request.onerror = (event) => { log('✗ Failed to initialize IndexedDB.'); reject(event.target.error); }; }); }
-
-function getFileKey(file) { if (!file) return null; const name = file.name || 'unknown'; const size = file.size || 0; const lastModified = file.lastModified ? new Date(file.lastModified).toISOString() : 'unknown'; return ${name}|${size}|${lastModified}; }
-
-function loadMarks(fileKey) { return new Promise((resolve, reject) => { if (!db) { resolve({ fileKey, marks: [] }); return; } const tx = db.transaction(STORE_NAME, 'readonly'); const store = tx.objectStore(STORE_NAME); const request = store.get(fileKey); request.onsuccess = () => { if (request.result) { resolve(request.result); } else { resolve({ fileKey, marks: [] }); } }; request.onerror = () => { reject(request.error); }; }); }
-
-function saveMarks(fileKey, marks) { return new Promise((resolve, reject) => { if (!db) { reject(new Error('DB not initialized')); return; } const tx = db.transaction(STORE_NAME, 'readwrite'); const store = tx.objectStore(STORE_NAME); const data = { fileKey, marks }; const request = store.put(data); request.onsuccess = () => resolve(); request.onerror = () => reject(request.error); }); }
-
-function updateMarksUI() { marksListEl.innerHTML = ''; if (!currentMarks || currentMarks.length === 0) { marksListEl.textContent = '(none)'; return; } currentMarks.slice().sort((a, b) => a - b).forEach((t) => { const span = document.createElement('span'); span.className = 'mark-item'; span.textContent = formatTime(t); span.title = Jump to mark at ${t.toFixed(3)} seconds; span.addEventListener('click', () => { audioPlayer.currentTime = t; log(Jumped to mark: ${formatTime(t)}); }); marksListEl.appendChild(span); }); }
-
-function updateFileInfo() { if (!currentFile) { fileInfoEl.textContent = ''; return; } const size = (currentFile.size / 1024 / 1024).toFixed(2); fileInfoEl.textContent = ${currentFile.name} (${size} MB); }
-
-// Event handlers
-
-audioFileInput.addEventListener('change', async (e) => { const file = e.target.files?.[0]; if (!file) { enableControls(false); return; } try { currentFile = file; currentFileKey = getFileKey(file); updateFileInfo(); const url = URL.createObjectURL(file); audioPlayer.src = url; enableControls(true); log(File selected: ${file.name}); const data = await loadMarks(currentFileKey); currentMarks = data.marks || []; updateMarksUI(); log(Loaded ${currentMarks.length} marks.); } catch (error) { log(Error: ${error.message}); enableControls(false); } });
-
-markBtn.addEventListener('click', async () => { const currentTime = audioPlayer.currentTime; if (currentMarks.includes(currentTime)) { log('Warning: Mark already exists at this position.'); return; } currentMarks.push(currentTime); await saveMarks(currentFileKey, currentMarks); updateMarksUI(); log(Mark added at ${formatTime(currentTime)}); });
-
-prevMarkBtn.addEventListener('click', () => { const currentTime = audioPlayer.currentTime; const prev = currentMarks.filter(m => m < currentTime).sort((a, b) => b - a)[0]; if (prev !== undefined) { audioPlayer.currentTime = prev; log(Jumped to previous mark: ${formatTime(prev)}); } else { audioPlayer.currentTime = 0; log('Jumped to start.'); } });
-
-deleteMarkBtn.addEventListener('click', async () => { const currentTime = audioPlayer.currentTime; const index = currentMarks.indexOf(currentTime); if (index === -1) { log('Warning: No mark at current position to delete.'); return; } currentMarks.splice(index, 1); await saveMarks(currentFileKey, currentMarks); updateMarksUI(); log(Mark deleted at ${formatTime(currentTime)}); });
-
-exportBtn.addEventListener('click', () => { const data = { fileName: currentFile.name, fileSize: currentFile.size, marks: currentMarks, exportDate: new Date().toISOString(), }; const json = JSON.stringify(data, null, 2); const blob = new Blob([json], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = marks_${Date.now()}.json; a.click(); URL.revokeObjectURL(url); log(Exported marks: ${a.download}); });
-
-importBtn.addEventListener('click', () => { document.getElementById('importFileInput').click(); });
-
-document.getElementById('importFileInput').addEventListener('change', async (e) => { const file = e.target.files?.[0]; if (!file) return; try { const text = await file.text(); const data = JSON.parse(text); if (!Array.isArray(data.marks)) throw new Error('Invalid mark file format.'); currentMarks = data.marks; await saveMarks(currentFileKey, currentMarks); updateMarksUI(); log(Imported ${currentMarks.length} marks.); } catch (e) { log(Import error: ${e.message}); } e.target.value = ''; });
-
-if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('service-worker.js') .then(() => log('Service Worker registered.')) .catch(error => log(Service Worker registration failed: ${error.message})); }); }
-
-openDB() .then(() => log('IndexedDB initialized.')) .catch(() => log('IndexedDB not available. Marks will not be saved.'));
-
-</script>
-
+<audio id="audioElement"></audio>
 <input type="file" id="importFileInput" accept="application/json" style="display:none;">
 
+<script>
+const DB_NAME = 'audioMarks_v2'; 
+const STORE_NAME = 'marks';
+let db, currentFileKey;
+let currentMarks = [];
+
+const audio = document.getElementById('audioElement');
+const playPauseBtn = document.getElementById('playPauseBtn');
+const btnIconContainer = document.getElementById('btnIcon');
+const seekBar = document.getElementById('seekBar');
+const speedSlider = document.getElementById('speedSlider');
+const speedVal = document.getElementById('speedVal');
+const logEl = document.getElementById('log');
+
+// DB Setup
+const req = indexedDB.open(DB_NAME, 1);
+req.onupgradeneeded = (e) => e.target.result.createObjectStore(STORE_NAME, { keyPath: 'fileKey' });
+req.onsuccess = (e) => { db = e.target.result; log("✓ system ready."); };
+
+function log(msg) {
+    const time = new Date().toLocaleTimeString();
+    logEl.textContent += `[${time}] ${msg}\n`;
+    logEl.scrollTop = logEl.scrollHeight;
+}
+
+function formatTime(sec) {
+    if (isNaN(sec)) return "0:00";
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function updatePlayBtnUI() {
+    if (audio.paused) {
+        btnIconContainer.innerHTML = '<div class="play-icon"></div>';
+    } else {
+        btnIconContainer.innerHTML = '<div class="pause-icon"><div class="pause-bar"></div><div class="pause-bar"></div></div>';
+    }
+}
+
+async function loadSavedMarks() {
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+    const getReq = store.get(currentFileKey);
+    getReq.onsuccess = () => {
+        currentMarks = getReq.result ? getReq.result.marks : [];
+        updateMarksUI();
+        if (currentMarks.length > 0) log(`restored ${currentMarks.length} marks.`);
+    };
+}
+
+document.getElementById('audioFile').onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    currentFileKey = `${file.name}-${file.size}`;
+    // ここでデザインしたfileInfoだけに名前を入れる
+    document.getElementById('fileInfo').textContent = `playing: ${file.name}`;
+    audio.src = URL.createObjectURL(file);
+    
+    playPauseBtn.disabled = false;
+    seekBar.disabled = false;
+    speedSlider.disabled = false;
+    document.querySelectorAll('.action-btn').forEach(b => b.disabled = false);
+    document.getElementById('exportBtn').style = "opacity: 1; pointer-events: auto;";
+    document.getElementById('importBtn').style = "opacity: 1; pointer-events: auto;";
+    
+    log(`file selected: ${file.name}`);
+    loadSavedMarks();
+};
+
+playPauseBtn.onclick = () => {
+    if (audio.paused) audio.play(); else audio.pause();
+    updatePlayBtnUI();
+};
+
+speedSlider.oninput = () => {
+    const val = parseFloat(speedSlider.value);
+    audio.playbackRate = val;
+    speedVal.textContent = val.toFixed(1);
+};
+
+audio.ontimeupdate = () => {
+    seekBar.value = (audio.currentTime / audio.duration) * 100 || 0;
+    document.getElementById('currentTime').textContent = formatTime(audio.currentTime);
+};
+
+audio.onloadedmetadata = () => {
+    document.getElementById('duration').textContent = formatTime(audio.duration);
+};
+
+seekBar.oninput = () => {
+    audio.currentTime = (seekBar.value / 100) * audio.duration;
+};
+
+async function save() {
+    if (!db || !currentFileKey) return;
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).put({ fileKey: currentFileKey, marks: currentMarks });
+}
+
+document.getElementById('markBtn').onclick = () => {
+    const t = audio.currentTime;
+    if (!currentMarks.some(m => Math.abs(m - t) < 0.3)) {
+        currentMarks.push(t);
+        save();
+        updateMarksUI();
+        log(`added mark: ${formatTime(t)}`);
+    }
+};
+
+document.getElementById('deleteMarkBtn').onclick = () => {
+    const t = audio.currentTime;
+    const pastMarks = currentMarks.filter(m => m < t - 0.1).sort((a, b) => b - a);
+    if (pastMarks.length > 0) {
+        const targetMark = pastMarks[0];
+        currentMarks.splice(currentMarks.indexOf(targetMark), 1);
+        save();
+        updateMarksUI();
+        log(`deleted mark at ${formatTime(targetMark)}`);
+    }
+};
+
+document.getElementById('prevMarkBtn').onclick = () => {
+    const prev = currentMarks.filter(m => m < audio.currentTime - 1).sort((a,b) => b-a)[0];
+    audio.currentTime = prev || 0;
+};
+
+function updateMarksUI() {
+    const list = document.getElementById('marksList');
+    list.innerHTML = '';
+    if (currentMarks.length === 0) { list.textContent = '(none)'; return; }
+    currentMarks.sort((a,b) => a-b).forEach(t => {
+        const item = document.createElement('div');
+        item.className = 'mark-item';
+        item.textContent = formatTime(t);
+        item.onclick = () => audio.currentTime = t;
+        list.appendChild(item);
+    });
+}
+
+document.getElementById('exportBtn').onclick = () => {
+    const blob = new Blob([JSON.stringify({ marks: currentMarks })], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `marks_${currentFileKey}.json`;
+    a.click();
+};
+
+document.getElementById('importBtn').onclick = () => document.getElementById('importFileInput').click();
+document.getElementById('importFileInput').onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+        const data = JSON.parse(await file.text());
+        currentMarks = data.marks || [];
+        save();
+        updateMarksUI();
+        log("marks imported.");
+    } catch(e) { log("error: invalid JSON file."); }
+};
+</script>
 </body>
-
 </html>
-
