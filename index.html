@@ -28,7 +28,7 @@ label { font-size: 1.1rem; font-weight: 600; margin-bottom: 12px; color: #a0d8ff
 
 audio#audioPlayer { width: 100%; height: 50px; border-radius: 20px; outline: none; box-shadow: none; background: #00334d; }
 
-#controls { display: flex; justify-content: center; gap: 48px; }
+#controls { display: flex; justify-content: center; gap: 48px; flex-direction: row; flex-wrap: nowrap; overflow-x: auto; }lex-direction: row; }
 
 button { background: transparent; border: none; cursor: pointer; color: #66ccff; display: flex; flex-direction: column; align-items: center; gap: 4px; font-weight: 600; user-select: none; padding: 0; min-width: 60px; transition: color 0.3s ease; }
 
@@ -82,13 +82,13 @@ button .label { font-size: 0.75rem; color: #66ccff; user-select: none; text-tran
 
 <div class="section"> <label for="audioFile">Select Audio File:</label> <input type="file" id="audioFile" accept="audio/*"> <div id="fileInfo" class="file-info"></div> </div>
 
-<div class="section"> <audio id="audioPlayer" preload="metadata"></audio> </div>
+<div class="section"> <audio id="audioPlayer" preload="metadata" controls></audio> </div>
 
 <div class="section" id="controls"> <button id="markBtn" disabled title="Add mark at current position"> <span class="icon">⚪︎</span> <span class="label">mark</span> </button> <button id="deleteMarkBtn" disabled title="Delete mark at current position"> <span class="icon">×</span> <span class="label">delete</span> </button> <button id="prevMarkBtn" disabled title="Jump to previous mark or start"> <span class="icon"><</span> <span class="label">previous</span> </button> </div>
 
 <div class="section"> <strong>Marks:</strong> <div id="marksList">(none)</div> </div>
 
-<div class="section"> <strong>Log:</strong> <div id="log"></div> <div id="exportImport"> <a href="#" id="exportBtn" disabled>export</a>│<a href="#" id="importBtn" disabled>import</a> </div> </div>
+<div class="section"> <strong>Log:</strong> <div id="log"></div> <div id="exportImport"> <a href="#" id="exportBtn" disabled>export</a> │ <a href="#" id="importBtn" disabled>import</a> </div> </div>
 
 </div>
 
