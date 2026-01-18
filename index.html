@@ -1,839 +1,319 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <!-- ===== メタデータ ===== -->
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Markable Audio Player</title>
-  
-  <!-- PWA設定 -->
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#000000">
-  
-  <!-- フォント読み込み -->
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Markable Audio Player</title>
+    <style>
+        /* ===== Global Styles ===== */
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: Helvetica, Arial, sans-serif; margin: 0; padding: 20px; background: #001f33; color: #a0d8ff; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        h1 { font-weight: 700; font-size: 1.1rem; margin: 10px 0 20px 0; letter-spacing: 2px; text-transform: uppercase; color: #a0d8ff; }
+        
+        .container { width: 100%; max-width: 800px; background: rgba(0, 31, 51, 0.9); border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 30px; }
+        .section { display: flex; flex-direction: column; align-items: center; }
+        
+        /* ファイル選択ボタン */
+        .file-upload-wrapper { position: relative; width: fit-content; margin-bottom: 10px; }
+        .custom-file-btn { 
+            display: inline-block; padding: 6px 14px; background: transparent; 
+            border: 1px solid #66ccff; color: #66ccff; border-radius: 6px; 
+            font-size: 0.75rem; font-weight: bold; cursor: pointer;
+        }
+        #audioFile { position: absolute; left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+        #fileInfo { font-size: 0.9rem; color: #7fbfff; margin: 5px 0 15px 0; font-style: italic; border-bottom: 1px solid #335577; padding-bottom: 8px; word-break: break-all; width: 100%; text-align: center; }
 
-  <style>
-    /* ===== グローバルスタイル ===== */
-    * {
-      box-sizing: border-box;
-    }
+        /* Custom Player UI */
+        .custom-player { background: #00334d; padding: 25px; border-radius: 24px; display: flex; flex-direction: column; gap: 25px; width: 100%; }
+        
+        /* コントロール行のセンタリング */
+        .player-controls-row { display: flex; align-items: center; justify-content: center; gap: 40px; width: 100%; }
+        
+        /* 10秒戻るボタン (修正版) */
+        .rewind-btn { 
+            background: transparent; border: none; color: #66ccff; cursor: pointer; 
+            width: 64px; height: 64px; position: relative; 
+            display: flex; align-items: center; justify-content: center; padding: 0;
+        }
+        /* SVGを修正 */
+        .rewind-btn svg { width: 58px; height: 58px; fill: currentColor; }
+        
+        .rewind-num { 
+            position: absolute; 
+            font-size: 16px; 
+            font-weight: 900; 
+            top: 50%; left: 50%; 
+            transform: translate(-50%, -50%); 
+            line-height: 1;
+            letter-spacing: -1px;
+        }
 
-    body {
-      font-family: 'Roboto', system-ui, -apple-system, sans-serif;
-      margin: 0;
-      padding: 48px 64px;
-      background: linear-gradient(135deg, #000000 0%, #0a0a0a 100%);
-      color: #e0e0e0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      min-height: 100vh;
-    }
+        .play-pause-btn { background: #66ccff; color: #001f33; border: none; border-radius: 50%; width: 85px; height: 85px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.1s; flex-shrink: 0; }
+        .play-pause-btn:active { transform: scale(0.95); }
+        .play-pause-btn:disabled { opacity: 0.3; }
 
-    /* ===== ページタイトル ===== */
-    h1 {
-      font-weight: 700;
-      font-size: 2.5rem;
-      margin: 0 0 32px 0;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: #00bfff;
-      text-shadow: 0 0 12px #00bfff;
-    }
+        .play-icon { width: 0; height: 0; border-style: solid; border-width: 15px 0 15px 25px; border-color: transparent transparent transparent #001f33; margin-left: 6px; }
+        .pause-icon { display: flex; gap: 8px; justify-content: center; align-items: center; }
+        .pause-bar { width: 8px; height: 30px; background-color: #001f33; border-radius: 2px; }
 
-    /* ===== メインコンテナ ===== */
-    .container {
-      width: 100%;
-      max-width: 800px;
-      background: rgba(15, 15, 15, 0.9);
-      border-radius: 20px;
-      padding: 48px;
-      box-shadow: 0 0 40px rgba(0, 191, 255, 0.7);
-      display: flex;
-      flex-direction: column;
-      gap: 32px;
-    }
+        .speed-control { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; color: #a0d8ff; }
+        #speedSlider { width: 130px; accent-color: #66ccff; margin: 0; cursor: pointer; }
+        .speed-label { font-size: 0.9rem; font-weight: bold; }
 
-    /* ===== セクション ===== */
-    .section {
-      display: flex;
-      flex-direction: column;
-    }
+        .seek-container { display: flex; align-items: center; gap: 15px; width: 100%; }
+        #seekBar { flex-grow: 1; height: 12px; accent-color: #66ccff; cursor: pointer; }
+        #currentTime, #duration { font-size: 1rem; min-width: 50px; font-weight: bold; }
 
-    /* ===== ラベル ===== */
-    label {
-      font-size: 1.1rem;
-      font-weight: 600;
-      margin-bottom: 12px;
-      color: #a0cfff;
-    }
+        #controls { display: flex; flex-direction: row !important; justify-content: center; gap: 20px; width: 100%; }
+        .action-btn { background: transparent; border: none; cursor: pointer; color: #66ccff; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 80px; flex: 1; }
+        .action-btn:disabled { opacity: 0.2; }
+        .action-btn .icon { font-size: 3rem; line-height: 1; }
+        .action-btn .label { font-size: 0.8rem; text-transform: lowercase; font-weight: bold; }
 
-    strong {
-      font-size: 1.1rem;
-      color: #a0cfff;
-      margin-bottom: 12px;
-      display: block;
-    }
+        #marksList { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; width: 100%; justify-content: center; }
+        .mark-item { border: 2px solid #66ccff; padding: 12px 20px; border-radius: 30px; color: #66ccff; font-weight: bold; font-size: 1.1rem; cursor: pointer; }
 
-    /* ===== ファイル入力 ===== */
-    input[type="file"] {
-      margin-top: 12px;
-      margin-bottom: 24px;
-      padding: 12px 16px;
-      border-radius: 16px;
-      border: 2px solid #00bfff;
-      background: #222;
-      color: #ccc;
-      font-size: 1rem;
-      width: 100%;
-      cursor: pointer;
-      transition: background 0.3s ease, border-color 0.3s ease;
-    }
-
-    input[type="file"]:hover {
-      background: #333;
-      border-color: #00d9ff;
-    }
-
-    /* ===== ファイル情報表示 ===== */
-    #fileInfo {
-      font-size: 0.9rem;
-      color: #888;
-      margin-top: -16px;
-      margin-bottom: 24px;
-      font-style: italic;
-    }
-
-    /* ===== オーディオプレイヤー ===== */
-    audio#audioPlayer {
-      width: 100%;
-      height: 50px;
-      border-radius: 20px;
-      outline: none;
-      box-shadow: 0 0 30px rgba(0, 191, 255, 0.5);
-    }
-
-    /* ===== コントロールボタングループ ===== */
-    #controls {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 24px;
-      justify-content: center;
-    }
-
-    /* ===== ボタン（共通スタイル） ===== */
-    button {
-      position: relative;
-      background: linear-gradient(135deg, #007acc, #00bfff);
-      border: none;
-      border-radius: 28px;
-      padding: 18px 28px;
-      color: #fff;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-      box-shadow: 0 6px 16px rgba(0, 191, 255, 0.7);
-      min-width: 140px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.3s ease, box-shadow 0.3s ease, transform 0.1s ease;
-    }
-
-    /* ===== ボタン：無効状態 ===== */
-    button:disabled {
-      background: #444;
-      color: #777;
-      box-shadow: none;
-      cursor: not-allowed;
-    }
-
-    /* ===== ボタン：ホバー状態 ===== */
-    button:hover:not(:disabled) {
-      background: linear-gradient(135deg, #00bfff, #007acc);
-      box-shadow: 0 8px 24px rgba(0, 191, 255, 1);
-      transform: translateY(-2px);
-    }
-
-    /* ===== ボタン：アクティブ状態 ===== */
-    button:active:not(:disabled) {
-      transform: translateY(0);
-    }
-
-    /* ===== ボタン内のアイコン ===== */
-    button .icon {
-      font-size: 2.4rem;
-      line-height: 1;
-      user-select: none;
-      margin-bottom: 6px;
-    }
-
-    /* ===== ボタン内のラベルテキスト ===== */
-    button .label {
-      font-size: 0.75rem;
-      color: #c0e8ff;
-      user-select: none;
-      text-transform: lowercase;
-      letter-spacing: 0.05em;
-    }
-
-    /* ===== マーク一覧コンテナ ===== */
-    #marksList {
-      font-size: 1.1rem;
-      margin-top: 12px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 16px;
-    }
-
-    /* ===== マーク項目（個別） ===== */
-    .mark-item {
-      background: #004466;
-      padding: 10px 18px;
-      border-radius: 24px;
-      cursor: pointer;
-      color: #a0d8ff;
-      font-weight: 700;
-      box-shadow: 0 0 12px rgba(0, 191, 255, 0.5);
-      transition: background 0.3s ease, box-shadow 0.3s ease;
-      user-select: none;
-      min-width: 60px;
-      text-align: center;
-    }
-
-    /* ===== マーク項目：ホバー状態 ===== */
-    .mark-item:hover {
-      background: #007acc;
-      color: #fff;
-      box-shadow: 0 0 16px rgba(0, 191, 255, 0.9);
-    }
-
-    /* ===== ログ表示エリア ===== */
-    #log {
-      font-size: 0.9rem;
-      background: rgba(0, 0, 0, 0.75);
-      padding: 20px;
-      border-radius: 16px;
-      max-height: 260px;
-      overflow-y: auto;
-      white-space: pre-wrap;
-      word-break: break-word;
-      box-shadow: inset 0 0 14px rgba(0, 191, 255, 0.3);
-      color: #a0cfff;
-      line-height: 1.4;
-      font-family: 'Courier New', monospace;
-    }
-
-    /* ===== ログのスクロールバーカスタマイズ ===== */
-    #log::-webkit-scrollbar {
-      width: 10px;
-    }
-
-    #log::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    #log::-webkit-scrollbar-thumb {
-      background: #00bfff;
-      border-radius: 5px;
-    }
-
-    #log::-webkit-scrollbar-thumb:hover {
-      background: #00d9ff;
-    }
-
-    /* ===== レスポンシブ対応 ===== */
-    @media (max-width: 768px) {
-      body {
-        padding: 24px 16px;
-      }
-
-      h1 {
-        font-size: 1.8rem;
-        margin-bottom: 24px;
-      }
-
-      .container {
-        padding: 24px;
-        gap: 24px;
-      }
-
-      button {
-        min-width: 120px;
-        padding: 14px 20px;
-      }
-
-      button .icon {
-        font-size: 1.8rem;
-      }
-
-      button .label {
-        font-size: 0.7rem;
-      }
-    }
-
-  </style>
-
+        #log { font-size: 0.85rem; background: rgba(0, 0, 0, 0.2); padding: 15px; border-radius: 12px; height: 110px; overflow-y: auto; border: 1px solid #00334d; white-space: pre-wrap; width: 100%; font-family: Helvetica, Arial, sans-serif; }
+        #exportImport { text-align: center; margin-top: 15px; color: #66ccff; }
+        #exportImport a { color: #66ccff; text-decoration: none; margin: 0 12px; font-size: 0.9rem; cursor: pointer; }
+    </style>
 </head>
-
 <body>
-  <!-- ===== ページヘッダー ===== -->
-  <h1>🎵 Markable Audio Player</h1>
 
-  <!-- ===== メインコンテナ ===== -->
-  <div class="container">
+<h1>MARKABLE AUDIO PLAYER</h1>
 
-    <!-- ===== セクション1：ファイル選択 ===== -->
+<div class="container">
     <div class="section">
-      <label for="audioFile">🎙️ 音声ファイルを選択:</label>
-      <input type="file" id="audioFile" accept="audio/*">
-      <div id="fileInfo" class="file-info"></div>
+        <div class="file-upload-wrapper">
+            <div class="custom-file-btn">SELECT FILE</div>
+            <input type="file" id="audioFile" accept="audio/*">
+        </div>
+        <div id="fileInfo">no file selected</div>
     </div>
 
-    <!-- ===== セクション2：オーディオプレイヤー ===== -->
-    <div class="section">
-      <audio id="audioPlayer" controls preload="metadata"></audio>
+    <div class="custom-player">
+        <div class="player-controls-row">
+            <button class="rewind-btn" id="rewindBtn" disabled>
+                <svg viewBox="0 0 24 24">
+                    <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 9.35 20.98 6.94 19.3 5.15L17.88 6.57C19.19 8.04 20 9.93 20 12C20 16.42 16.42 20 12 20C7.58 20 4 16.42 4 12C4 7.58 7.58 4 12 4V7L17 3L12 -1V2Z" transform="rotate(-90 12 12) scale(0.9 0.9) translate(1.5 1.5)"/>
+                </svg>
+                <span class="rewind-num">10</span>
+            </button>
+
+            <button class="play-pause-btn" id="playPauseBtn" disabled>
+                <div id="btnIcon"><div class="play-icon"></div></div>
+            </button>
+
+            <div class="speed-control">
+                <span class="speed-label">speed: <span id="speedVal">1.0</span>x</span>
+                <input type="range" id="speedSlider" min="0.5" max="4.0" step="0.1" value="1.0" disabled>
+            </div>
+        </div>
+        
+        <div class="seek-container">
+            <span id="currentTime">0:00</span>
+            <input type="range" id="seekBar" value="0" step="0.1" disabled>
+            <span id="duration">0:00</span>
+        </div>
     </div>
 
-    <!-- ===== セクション3：コントロールボタン ===== -->
     <div class="section" id="controls">
-      <!-- 再生/一時停止ボタン -->
-      <button id="playPauseBtn" disabled title="スペースキーでも操作可">
-        <span class="icon">▶</span>
-        <span class="label">再生</span>
-      </button>
-
-      <!-- マーク追加ボタン -->
-      <button id="markBtn" disabled title="現在位置にマークを追加">
-        <span class="icon">⭐</span>
-        <span class="label">マーク</span>
-      </button>
-
-      <!-- 前のマークへジャンプボタン -->
-      <button id="prevMarkBtn" disabled title="前のマークか冒頭へジャンプ">
-        <span class="icon">⬅</span>
-        <span class="label">前へ</span>
-      </button>
-
-      <!-- 次のマークへジャンプボタン -->
-      <button id="nextMarkBtn" disabled title="次のマークへジャンプ">
-        <span class="icon">➡</span>
-        <span class="label">次へ</span>
-      </button>
-
-      <!-- マーク削除ボタン -->
-      <button id="deleteMarkBtn" disabled title="現在位置のマークを削除">
-        <span class="icon">❌</span>
-        <span class="label">削除</span>
-      </button>
-
-      <!-- エクスポートボタン -->
-      <button id="exportBtn" disabled title="マークをJSONファイルにエクスポート">
-        <span class="icon">⬇</span>
-        <span class="label">保存</span>
-      </button>
-
-      <!-- インポートボタン -->
-      <button id="importBtn" disabled title="保存したマークをインポート">
-        <span class="icon">⬆</span>
-        <span class="label">読込</span>
-      </button>
-
-      <!-- インポート用隠しファイル入力 -->
-      <input type="file" id="importFileInput" accept="application/json" style="display:none;">
+        <button id="markBtn" class="action-btn" disabled>
+            <span class="icon">⚪︎</span>
+            <span class="label">mark</span>
+        </button>
+        <button id="deleteMarkBtn" class="action-btn" disabled>
+            <span class="icon">×</span>
+            <span class="label">delete</span>
+        </button>
+        <button id="prevMarkBtn" class="action-btn" disabled>
+            <span class="icon">&lt;</span>
+            <span class="label">previous</span>
+        </button>
     </div>
 
-    <!-- ===== セクション4：マーク一覧 ===== -->
     <div class="section">
-      <strong>📍 マーク一覧:</strong>
-      <div id="marksList">(なし)</div>
+        <label style="font-weight: bold; margin-bottom: 10px;">marks</label>
+        <div id="marksList">(none)</div>
     </div>
 
-    <!-- ===== セクション5：ログ表示 ===== -->
     <div class="section">
-      <strong>📝 ログ:</strong>
-      <div id="log"></div>
+        <div id="log"></div>
+        <div id="exportImport">
+            <a id="exportBtn" style="opacity: 0.3; pointer-events: none;">export</a> │ 
+            <a id="importBtn" style="opacity: 0.3; pointer-events: none;">import</a>
+        </div>
     </div>
+</div>
 
-  </div>
+<audio id="audioElement"></audio>
+<input type="file" id="importFileInput" accept="application/json" style="display:none;">
 
-  <!-- ===== JavaScriptコード ===== -->
-  <script>
-    // ============================================
-    // IndexedDB設定定数
-    // ============================================
-    // これらの定数はデータベースの基本設定です
-    const DB_NAME = 'audioMarks';        // データベース名
-    const DB_VERSION = 1;                 // データベースバージョン
-    const STORE_NAME = 'marks';           // オブジェクトストア名
+<script>
+const DB_NAME = 'audioMarks_v2'; 
+const STORE_NAME = 'marks';
+let db, currentFileKey;
+let currentMarks = [];
 
-    // ============================================
-    // グローバル変数
-    // ============================================
-    // アプリケーション全体で使用する変数
-    let db = null;                        // IndexedDBのデータベースオブジェクト
-    let currentFile = null;               // 現在選択されているファイル
-    let currentFileKey = null;            // ファイルの一意キー
-    let currentMarks = [];                // 現在のマーク配列
+const audio = document.getElementById('audioElement');
+const playPauseBtn = document.getElementById('playPauseBtn');
+const rewindBtn = document.getElementById('rewindBtn');
+const btnIconContainer = document.getElementById('btnIcon');
+const seekBar = document.getElementById('seekBar');
+const speedSlider = document.getElementById('speedSlider');
+const speedVal = document.getElementById('speedVal');
+const logEl = document.getElementById('log');
 
-    // ============================================
-    // DOM要素の取得
-    // ============================================
-    // HTMLの要素を変数に保存（効率化）
-    const audioFileInput = document.getElementById('audioFile');
-    const audioPlayer = document.getElementById('audioPlayer');
-    const playPauseBtn = document.getElementById('playPauseBtn');
-    const markBtn = document.getElementById('markBtn');
-    const prevMarkBtn = document.getElementById('prevMarkBtn');
-    const nextMarkBtn = document.getElementById('nextMarkBtn');
-    const exportBtn = document.getElementById('exportBtn');
-    const importBtn = document.getElementById('importBtn');
-    const deleteMarkBtn = document.getElementById('deleteMarkBtn');
-    const importFileInput = document.getElementById('importFileInput');
-    const marksListEl = document.getElementById('marksList');
-    const logEl = document.getElementById('log');
-    const fileInfoEl = document.getElementById('fileInfo');
+const req = indexedDB.open(DB_NAME, 1);
+req.onupgradeneeded = (e) => e.target.result.createObjectStore(STORE_NAME, { keyPath: 'fileKey' });
+req.onsuccess = (e) => { db = e.target.result; log("✓ system ready."); };
 
-    // ============================================
-    // ユーティリティ関数
-    // ============================================
+function log(msg) {
+    const time = new Date().toLocaleTimeString();
+    logEl.textContent += `[${time}] ${msg}\n`;
+    logEl.scrollTop = logEl.scrollHeight;
+}
 
-    /**
-     * ログメッセージを画面に出力
-     * @param {string} message - 出力するメッセージ
-     * 
-     * 使用例: log('マークを追加しました。')
-     */
-    function log(message) {
-      const time = new Date().toLocaleTimeString();
-      logEl.textContent += `[${time}] ${message}\n`;
-      logEl.scrollTop = logEl.scrollHeight;  // 最新のログまで自動スクロール
+function formatTime(sec) {
+    if (isNaN(sec)) return "0:00";
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function updatePlayBtnUI() {
+    if (audio.paused) {
+        btnIconContainer.innerHTML = '<div class="play-icon"></div>';
+    } else {
+        btnIconContainer.innerHTML = '<div class="pause-icon"><div class="pause-bar"></div><div class="pause-bar"></div></div>';
     }
+}
 
-    /**
-     * 秒数を MM:SS 形式にフォーマット
-     * @param {number} sec - 秒数
-     * @returns {string} フォーマット済みの時間文字列
-     * 
-     * 使用例: formatTime(95) → "1:35"
-     */
-    function formatTime(sec) {
-      const s = Math.floor(sec % 60);
-      const m = Math.floor(sec / 60);
-      return `${m}:${s.toString().padStart(2, '0')}`;
+async function loadSavedMarks() {
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+    const getReq = store.get(currentFileKey);
+    getReq.onsuccess = () => {
+        currentMarks = getReq.result ? getReq.result.marks : [];
+        updateMarksUI();
+        if (currentMarks.length > 0) log(`restored ${currentMarks.length} marks.`);
+    };
+}
+
+document.getElementById('audioFile').onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    currentFileKey = `${file.name}-${file.size}`;
+    document.getElementById('fileInfo').textContent = `playing: ${file.name}`;
+    audio.src = URL.createObjectURL(file);
+    
+    playPauseBtn.disabled = false;
+    rewindBtn.disabled = false;
+    seekBar.disabled = false;
+    speedSlider.disabled = false;
+    document.querySelectorAll('.action-btn').forEach(b => b.disabled = false);
+    document.getElementById('exportBtn').style = "opacity: 1; pointer-events: auto;";
+    document.getElementById('importBtn').style = "opacity: 1; pointer-events: auto;";
+    
+    log(`file selected: ${file.name}`);
+    loadSavedMarks();
+};
+
+playPauseBtn.onclick = () => {
+    if (audio.paused) audio.play(); else audio.pause();
+    updatePlayBtnUI();
+};
+
+rewindBtn.onclick = () => {
+    audio.currentTime = Math.max(0, audio.currentTime - 10);
+    log("rewind 10s");
+};
+
+speedSlider.oninput = () => {
+    const val = parseFloat(speedSlider.value);
+    audio.playbackRate = val;
+    speedVal.textContent = val.toFixed(1);
+};
+
+audio.ontimeupdate = () => {
+    seekBar.value = (audio.currentTime / audio.duration) * 100 || 0;
+    document.getElementById('currentTime').textContent = formatTime(audio.currentTime);
+};
+
+audio.onloadedmetadata = () => {
+    document.getElementById('duration').textContent = formatTime(audio.duration);
+};
+
+seekBar.oninput = () => {
+    audio.currentTime = (seekBar.value / 100) * audio.duration;
+};
+
+async function save() {
+    if (!db || !currentFileKey) return;
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).put({ fileKey: currentFileKey, marks: currentMarks });
+}
+
+document.getElementById('markBtn').onclick = () => {
+    const t = audio.currentTime;
+    if (!currentMarks.some(m => Math.abs(m - t) < 0.3)) {
+        currentMarks.push(t);
+        save();
+        updateMarksUI();
+        log(`added mark: ${formatTime(t)}`);
     }
+};
 
-    /**
-     * コントロールボタンを有効/無効に切り替え
-     * @param {boolean} enabled - true で有効、false で無効
-     * 
-     * 使用例: enableControls(true) ですべてのボタンが使用可能に
-     */
-    function enableControls(enabled) {
-      playPauseBtn.disabled = !enabled;
-      markBtn.disabled = !enabled;
-      prevMarkBtn.disabled = !enabled;
-      nextMarkBtn.disabled = !enabled;
-      deleteMarkBtn.disabled = !enabled;
-      exportBtn.disabled = !enabled;
-      importBtn.disabled = !enabled;
+document.getElementById('deleteMarkBtn').onclick = () => {
+    const t = audio.currentTime;
+    const pastMarks = currentMarks.filter(m => m < t - 0.1).sort((a, b) => b - a);
+    if (pastMarks.length > 0) {
+        const targetMark = pastMarks[0];
+        currentMarks.splice(currentMarks.indexOf(targetMark), 1);
+        save();
+        updateMarksUI();
+        log(`deleted mark at ${formatTime(targetMark)}`);
     }
+};
 
-    // ============================================
-    // IndexedDB操作関数
-    // ============================================
+document.getElementById('prevMarkBtn').onclick = () => {
+    const prev = currentMarks.filter(m => m < audio.currentTime - 1).sort((a,b) => b-a)[0];
+    audio.currentTime = prev || 0;
+};
 
-    /**
-     * IndexedDBを初期化
-     * @returns {Promise} 初期化完了時に解決
-     * 
-     * 初回実行時はオブジェクトストアを作成
-     */
-    function openDB() {
-      return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
+function updateMarksUI() {
+    const list = document.getElementById('marksList');
+    list.innerHTML = '';
+    if (currentMarks.length === 0) { list.textContent = '(none)'; return; }
+    currentMarks.sort((a,b) => a-b).forEach(t => {
+        const item = document.createElement('div');
+        item.className = 'mark-item';
+        item.textContent = formatTime(t);
+        item.onclick = () => audio.currentTime = t;
+        list.appendChild(item);
+    });
+}
 
-        // データベースのアップグレードが必要な場合
-        request.onupgradeneeded = (event) => {
-          const db = event.target.result;
-          if (!db.objectStoreNames.contains(STORE_NAME)) {
-            db.createObjectStore(STORE_NAME, { keyPath: 'fileKey' });
-            log('IndexedDB: オブジェクトストアを作成しました。');
-          }
-        };
+document.getElementById('exportBtn').onclick = () => {
+    const blob = new Blob([JSON.stringify({ marks: currentMarks })], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `marks_${currentFileKey}.json`;
+    a.click();
+};
 
-        // 成功時
-        request.onsuccess = (event) => {
-          db = event.target.result;
-          log('✓ IndexedDB に接続しました。');
-          resolve(db);
-        };
-
-        // 失敗時
-        request.onerror = (event) => {
-          log('✗ IndexedDB の初期化に失敗しました。');
-          reject(event.target.error);
-        };
-      });
-    }
-
-    /**
-     * ファイルの一意キーを生成
-     * @param {File} file - ファイルオブジェクト
-     * @returns {string} ファイルキー
-     * 
-     * ファイル名、サイズ、更新日時から一意のキーを作成
-     */
-    function getFileKey(file) {
-      if (!file) return null;
-      const name = file.name || 'unknown';
-      const size = file.size || 0;
-      const lastModified = file.lastModified
-        ? new Date(file.lastModified).toISOString()
-        : 'unknown';
-      return `${name}|${size}|${lastModified}`;
-    }
-
-    /**
-     * IndexedDBからマークを読み込み
-     * @param {string} fileKey - ファイルキー
-     * @returns {Promise} マーク情報を含むPromise
-     * 
-     * 保存されたマークが無い場合は空の配列を返す
-     */
-    function loadMarks(fileKey) {
-      return new Promise((resolve, reject) => {
-        if (!db) {
-          // データベースが初期化されていない場合
-          resolve({ fileKey, marks: [] });
-          return;
-        }
-
-        const tx = db.transaction(STORE_NAME, 'readonly');
-        const store = tx.objectStore(STORE_NAME);
-        const request = store.get(fileKey);
-
-        request.onsuccess = () => {
-          if (request.result) {
-            resolve(request.result);
-          } else {
-            // マークが存在しない場合
-            resolve({ fileKey, marks: [] });
-          }
-        };
-
-        request.onerror = () => {
-          reject(request.error);
-        };
-      });
-    }
-
-    /**
-     * マークをIndexedDBに保存
-     * @param {string} fileKey - ファイルキー
-     * @param {Array} marks - マーク配列
-     * @returns {Promise} 保存完了時に解決
-     * 
-     * 既存のマークは上書きされます
-     */
-    function saveMarks(fileKey, marks) {
-      return new Promise((resolve, reject) => {
-        if (!db) {
-          reject(new Error('DB not initialized'));
-          return;
-        }
-
-        const tx = db.transaction(STORE_NAME, 'readwrite');
-        const store = tx.objectStore(STORE_NAME);
-        const data = { fileKey, marks };
-        const request = store.put(data);
-
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-      });
-    }
-
-    // ============================================
-    // UI更新関数
-    // ============================================
-
-    /**
-     * マーク一覧をUIに反映
-     * 
-     * 時間順にソートされたマークを表示
-     */
-    function updateMarksUI() {
-      marksListEl.innerHTML = '';
-
-      // マークがない場合
-      if (!currentMarks || currentMarks.length === 0) {
-        marksListEl.textContent = '(なし)';
-        return;
-      }
-
-      // マークを時間順でソート
-      currentMarks
-        .slice()
-        .sort((a, b) => a - b)
-        .forEach((t) => {
-          const span = document.createElement('span');
-          span.className = 'mark-item';
-          span.textContent = formatTime(t);
-          span.title = `${t.toFixed(3)} 秒でジャンプ`;
-
-          // クリックでそのマークへジャンプ
-          span.addEventListener('click', () => {
-            audioPlayer.currentTime = t;
-            log(`🎯 マークへジャンプ: ${formatTime(t)}`);
-          });
-
-          marksListEl.appendChild(span);
-        });
-    }
-
-    /**
-     * ファイル情報をUIに表示
-     * 
-     * ファイル名とサイズを表示
-     */
-    function updateFileInfo() {
-      if (!currentFile) {
-        fileInfoEl.textContent = '';
-        return;
-      }
-
-      const size = (currentFile.size / 1024 / 1024).toFixed(2);
-      fileInfoEl.textContent = `📄 ${currentFile.name} (${size} MB)`;
-    }
-
-    // ============================================
-    // イベントハンドラ：ファイル選択
-    // ============================================
-    audioFileInput.addEventListener('change', async (e) => {
-      const file = e.target.files?.[0];
-
-      if (!file) {
-        enableControls(false);
-        return;
-      }
-
-      try {
-        currentFile = file;
-        currentFileKey = getFileKey(file);
-        updateFileInfo();
-
-        // ファイルをオーディオプレイヤーに設定
-        const url = URL.createObjectURL(file);
-        audioPlayer.src = url;
-        enableControls(true);
-
-        log(`✓ ファイルが選択されました: ${file.name}`);
-
-        // 保存されたマークを読み込み
-        const data = await loadMarks(currentFileKey);
+document.getElementById('importBtn').onclick = () => document.getElementById('importFileInput').click();
+document.getElementById('importFileInput').onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+        const data = JSON.parse(await file.text());
         currentMarks = data.marks || [];
+        save();
         updateMarksUI();
-        log(`🔄 マーク ${currentMarks.length} 個を読み込みました。`);
-      } catch (error) {
-        log(`✗ エラー: ${error.message}`);
-        enableControls(false);
-      }
-    });
-
-    // ============================================
-    // イベントハンドラ：再生/一時停止
-    // ============================================
-    playPauseBtn.addEventListener('click', () => {
-      if (audioPlayer.paused) {
-        audioPlayer.play();
-        log('▶ 再生開始');
-      } else {
-        audioPlayer.pause();
-        log('⏸ 一時停止');
-      }
-    });
-
-    // スペースキーでも再生/一時停止
-    document.addEventListener('keydown', (e) => {
-      if (e.code === 'Space' && !playPauseBtn.disabled) {
-        e.preventDefault();
-        playPauseBtn.click();
-      }
-    });
-
-    // ============================================
-    // イベントハンドラ：マーク追加
-    // ============================================
-    markBtn.addEventListener('click', async () => {
-      const currentTime = audioPlayer.currentTime;
-
-      // 既に同じ位置にマークがあるか確認
-      if (currentMarks.includes(currentTime)) {
-        log(`⚠️ この位置には既にマークがあります。`);
-        return;
-      }
-
-      currentMarks.push(currentTime);
-      await saveMarks(currentFileKey, currentMarks);
-      updateMarksUI();
-      log(`⭐ マーク追加: ${formatTime(currentTime)}`);
-    });
-
-    // ============================================
-    // イベントハンドラ：前のマークへジャンプ
-    // ============================================
-    prevMarkBtn.addEventListener('click', () => {
-      const currentTime = audioPlayer.currentTime;
-      
-      // 現在の時間より前のマークを探す
-      const prev = currentMarks
-        .filter((m) => m < currentTime)
-        .sort((a, b) => b - a)[0];
-
-      if (prev !== undefined) {
-        audioPlayer.currentTime = prev;
-        log(`⬅️ 前のマークへ: ${formatTime(prev)}`);
-      } else {
-        // 前のマークがない場合は冒頭へ
-        audioPlayer.currentTime = 0;
-        log(`⬅️ 冒頭へ移動しました。`);
-      }
-    });
-
-    // ============================================
-    // イベントハンドラ：次のマークへジャンプ
-    // ============================================
-    nextMarkBtn.addEventListener('click', () => {
-      const currentTime = audioPlayer.currentTime;
-      
-      // 現在の時間より後のマークを探す
-      const next = currentMarks
-        .filter((m) => m > currentTime)
-        .sort((a, b) => a - b)[0];
-
-      if (next !== undefined) {
-        audioPlayer.currentTime = next;
-        log(`➡️ 次のマークへ: ${formatTime(next)}`);
-      } else {
-        // 次のマークがない場合
-        log(`⚠️ 次のマークがありません。`);
-      }
-    });
-
-    // ============================================
-    // イベントハンドラ：マーク削除
-    // ============================================
-    deleteMarkBtn.addEventListener('click', async () => {
-      const currentTime = audioPlayer.currentTime;
-      const index = currentMarks.indexOf(currentTime);
-
-      if (index === -1) {
-        log(`⚠️ この位置にはマークがありません。`);
-        return;
-      }
-
-      currentMarks.splice(index, 1);
-      await saveMarks(currentFileKey, currentMarks);
-      updateMarksUI();
-      log(`❌ マーク削除: ${formatTime(currentTime)}`);
-    });
-
-    // ============================================
-    // イベントハンドラ：エクスポート
-    // ============================================
-    exportBtn.addEventListener('click', () => {
-      // エクスポート用のデータ構造
-      const data = {
-        fileName: currentFile.name,
-        fileSize: currentFile.size,
-        marks: currentMarks,
-        exportDate: new Date().toISOString(),
-      };
-
-      // JSON形式で出力
-      const json = JSON.stringify(data, null, 2);
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      
-      // ダウンロード実行
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `marks_${Date.now()}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-
-      log(`⬇️ マークをエクスポートしました: ${a.download}`);
-    });
-
-    // ============================================
-    // イベントハンドラ：インポート
-    // ============================================
-    importBtn.addEventListener('click', () => {
-      // ファイル選択ダイアログを開く
-      importFileInput.click();
-    });
-
-    importFileInput.addEventListener('change', async (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-
-      try {
-        const text = await file.text();
-        const data = JSON.parse(text);
-
-        // データ形式の検証
-        if (!Array.isArray(data.marks)) {
-          throw new Error('無効なマークファイル形式です。');
-        }
-
-        // マークを更新
-        currentMarks = data.marks;
-        await saveMarks(currentFileKey, currentMarks);
-        updateMarksUI();
-        log(`✓ マーク ${currentMarks.length} 個をインポートしました。`);
-      } catch (e) {
-        log(`✗ インポート処理中にエラーが発生しました: ${e.message}`);
-      }
-
-      // ファイル入力をリセット
-      importFileInput.value = '';
-    });
-
-    // ============================================
-    // Service Worker登録
-    // ============================================
-    // PWA対応: Service Workerを登録してオフライン機能を有効化
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker
-          .register('service-worker.js')
-          .then((registration) => {
-            log('✓ Service Worker を登録しました。');
-          })
-          .catch((error) => {
-            log(
-              `⚠️ Service Worker の登録に失敗: ${error.message}`
-            );
-          });
-      });
-    }
-
-    // ============================================
-    // 初期化処理
-    // ============================================
-    // アプリケーション起動時の初期化
-    openDB()
-      .then(() => {
-        log('✓ IndexedDB 初期化完了。');
-      })
-      .catch(() => {
-        log(
-          '⚠️ IndexedDB を利用できません。マーク保存は動作しません。'
-        );
-      });
-  </script>
-
+        log("marks imported.");
+    } catch(e) { log("error: invalid JSON file."); }
+};
+</script>
 </body>
 </html>
